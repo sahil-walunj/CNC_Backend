@@ -4,7 +4,7 @@ import axios from "axios";
 import Seller from "../models/Seller.js";
 import decryptApiKey from "../utils/decryption.js";
 import createSign from "../utils/createSign.js";
-
+import auth from "../middleware/auth.js";
 let router = express.Router();
 
 
@@ -12,13 +12,13 @@ router.get('/ping', (req, res) => {
     res.send('pong');
 });
 
-router.get('/products', async (req, res) => {
-    const sellerID = req.body.sellerID;
+router.get('/products',auth, async (req, res) => {
+    const sellerID = req.sellerId;
 
     const amazonAPIUrl = process.env.AMAZONAPI_URL + "api/seller/products";
     const flipkartAPIUrl = process.env.FLIPKARTAPI_URL + "api/seller/products";
 
-    const seller = await Seller.findOne({ email: sellerID });
+    const seller = await Seller.findOne({ _id: sellerID });
 
     let amazonAPI = seller.AmazonApiKey;
     let flipkartAPI = seller.FlipkartApiKey;
@@ -59,8 +59,23 @@ router.get('/products', async (req, res) => {
                 "x-api-signature": flipkartAPIsign
             }
         });
-
-        res.json({ amazonProducts: amazonResponse.data, flipkartProducts: flipkartResponse.data });
+        let products = [];
+        let amazonList = amazonResponse.data.products;
+        let flipkartList = flipkartResponse.data.products;
+        // console.log(flipkartList);
+        for(let i = 0; i < amazonList.length; i++) {
+            products.push( {"title": amazonList[i].Title,"amazonList" : amazonList[i] , "flipkartList" : NaN});
+        }
+        for(let i = 0; i < flipkartList.length; i++) {
+            let iterator= products.find(product => product.title === flipkartList[i].title);
+            if(iterator) {
+                iterator.flipkartList = flipkartList[i];
+            }
+            else {
+                products.push( {"title": flipkartList[i].title,"flipkartList" : flipkartList[i] , "amazonList" : NaN});
+            }
+        }
+        res.status(200).json(products);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error fetching products' });

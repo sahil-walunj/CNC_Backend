@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 export default (req, res, next) => {
   const bearer = req.header('Authorization');
-console.log(bearer);
+  // console.log(bearer);
   if (!bearer) {
     return res.status(401).send({ error: 'No token provided' });
   }

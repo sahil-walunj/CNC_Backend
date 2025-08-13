@@ -8,7 +8,7 @@ import sellerRoutes from "./routes/seller.js";
 const app= express();
 const port = process.env.PORT || 5254;
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URL, {

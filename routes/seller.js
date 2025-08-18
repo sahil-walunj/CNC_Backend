@@ -148,4 +148,109 @@ router.post('/new/product', auth, async (req, res) => {
     }
     res.status(200).json(result);
 })
+
+router.post('/quantityChange', auth, async (req, res) => {
+    const createFor = req.body.createFor;
+    const sellerID = req.sellerId;
+    const amazonAPIUrl = process.env.AMAZONAPI_URL + "api/seller/updateQuantity";
+    const flipkartAPIUrl = process.env.FLIPKARTAPI_URL + "api/seller/updateQuantity";
+
+    const seller = await Seller.findOne({ _id: sellerID });
+
+    let amazonAPI = seller.AmazonApiKey;
+    let flipkartAPI = seller.FlipkartApiKey;
+    let AmazonSecretKey = seller.AmazonSecretKey;
+    let FlipkartSecretKey = seller.FlipkartSecretKey;
+
+    const amazonAPIIV = seller.AmazonApiIV;
+    const flipkartAPIIV = seller.FlipkartApiKeyIV;
+    const AmazonSecretKeyIV = seller.AmazonSecretIV;
+    const FlipkartSecretKeyIV = seller.FlipkartSecretKeyIV;
+
+    amazonAPI = decryptApiKey(amazonAPI, amazonAPIIV);
+    flipkartAPI = decryptApiKey(flipkartAPI, flipkartAPIIV);
+    AmazonSecretKey = decryptApiKey(AmazonSecretKey, AmazonSecretKeyIV);
+    FlipkartSecretKey = decryptApiKey(FlipkartSecretKey, FlipkartSecretKeyIV);  
+
+    const amazonAPIsign = createSign(AmazonSecretKey, "POST", "/api/seller/updateQuantity");
+    const flipkartAPIsign = createSign(FlipkartSecretKey, "POST", "/api/seller/updateQuantity");
+
+    const {amazonQuantity , flipkartQuantity , asin ,flipkartId,tochangeQuantity} = req.body;
+    let result = [];
+    if(tochangeQuantity.includes("Amazon") && asin && amazonQuantity){
+        const response = await axios.post(amazonAPIUrl, {
+            asin: asin,
+            quantity: amazonQuantity
+        }, {
+        headers: {
+            "x-api-key": amazonAPI,
+            "x-api-signature": amazonAPIsign
+        }
+        })
+        if (response.status !== 200) {
+            res.status(500).json(response.data);
+        }
+        result.push(response.data);
+    }
+    if(tochangeQuantity.includes("Flipkart") && flipkartId && flipkartQuantity){
+        const response = await axios.post(flipkartAPIUrl, {
+            flipkartId: flipkartId,
+            quantity: flipkartQuantity
+        }, {
+        headers: {
+            "x-api-key": flipkartAPI,
+            "x-api-signature": flipkartAPIsign
+        }
+        })
+        if (response.status !== 200) {
+            res.status(500).json(response.data);
+        }
+        result.push(response.data);
+    }
+    res.status(200).json(result);
+})
+
+router.get('/orders', auth, async (req, res) => {
+    const sellerID = req.sellerId;
+    const seller = await Seller.findOne({ _id: sellerID });
+    
+    let amazonAPI = seller.AmazonApiKey;
+    let flipkartAPI = seller.FlipkartApiKey;
+    let AmazonSecretKey = seller.AmazonSecretKey;
+    let FlipkartSecretKey = seller.FlipkartSecretKey;
+
+    const amazonAPIIV = seller.AmazonApiIV;
+    const flipkartAPIIV = seller.FlipkartApiKeyIV;
+    const AmazonSecretKeyIV = seller.AmazonSecretIV;
+    const FlipkartSecretKeyIV = seller.FlipkartSecretKeyIV;
+
+    amazonAPI = decryptApiKey(amazonAPI, amazonAPIIV);
+    flipkartAPI = decryptApiKey(flipkartAPI, flipkartAPIIV);
+    AmazonSecretKey = decryptApiKey(AmazonSecretKey, AmazonSecretKeyIV);
+    FlipkartSecretKey = decryptApiKey(FlipkartSecretKey, FlipkartSecretKeyIV);
+
+    const amazonAPIsign = createSign(AmazonSecretKey, "GET", "/api/seller/orders");
+    const flipkartAPIsign = createSign(FlipkartSecretKey, "GET", "/api/seller/orders");
+
+    const amazonAPIUrl = process.env.AMAZONAPI_URL + "api/seller/orders";
+    const flipkartAPIUrl = process.env.FLIPKARTAPI_URL + "api/seller/orders";
+
+    let toSend = [];
+    const response = await axios.get(amazonAPIUrl, {
+        headers: {
+            "x-api-key": amazonAPI,
+            "x-api-signature": amazonAPIsign
+        }
+    })
+    toSend.push({"amazonOrders":response.data});
+    const response2 = await axios.get(flipkartAPIUrl, {
+        headers: {
+            "x-api-key": flipkartAPI,
+            "x-api-signature": flipkartAPIsign
+        }
+    })
+    toSend.push({"flipkartOrders":response2.data});
+    res.status(200).json(toSend);
+    
+})
 export default router;
